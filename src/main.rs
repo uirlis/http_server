@@ -1,15 +1,17 @@
 use bytecodec::DecodeExt;
-use httpcodec::{HttpVersion, ReasonPhrase, Request, RequestDecoder, Response, StatusCode};
+use httpcodec::{HttpVersion, ReasonPhrase, RequestDecoder, Response, StatusCode};
 use std::io::{Read, Write};
 use wasmedge_wasi_socket::{Shutdown, TcpListener, TcpStream};
 
-fn handle_http(req: Request<String>) -> bytecodec::Result<Response<String>> {
-    Ok(Response::new(
-        HttpVersion::V1_0,
-        StatusCode::new(200)?,
-        ReasonPhrase::new("")?,
-        format!("echo: {}", req.body()),
-    ))
+mod handler;
+
+fn main() -> std::io::Result<()> {
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    println!("new connection at {}", port);
+    let listener = TcpListener::bind(format!("0.0.0.0:{}", port), false)?;
+    loop {
+        let _ = handle_client(listener.accept(false)?.0);
+    }
 }
 
 fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
@@ -28,7 +30,10 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
         RequestDecoder::<httpcodec::BodyDecoder<bytecodec::bytes::Utf8Decoder>>::default();
 
     let req = match decoder.decode_from_bytes(data.as_slice()) {
-        Ok(req) => handle_http(req),
+        Ok(req) => match req.request_target().as_str() {
+            "/health/readiness" | "/health/liveness" => return200(),
+            _ => handler::index(req),
+        },
         Err(e) => Err(e),
     };
 
@@ -46,16 +51,16 @@ fn handle_client(mut stream: TcpStream) -> std::io::Result<()> {
     };
 
     let write_buf = r.to_string();
-    stream.write(write_buf.as_bytes())?;
+    stream.write_all(write_buf.as_bytes())?;
     stream.shutdown(Shutdown::Both)?;
     Ok(())
 }
 
-fn main() -> std::io::Result<()> {
-    let port = std::env::var("PORT").unwrap_or("1234".to_string());
-    println!("new connection at {}", port);
-    let listener = TcpListener::bind(format!("0.0.0.0:{}", port), false)?;
-    loop {
-        let _ = handle_client(listener.accept(false)?.0);
-    }
+fn return200() -> bytecodec::Result<Response<String>> {
+    Ok(Response::new(
+        HttpVersion::V1_0,
+        StatusCode::new(200)?,
+        ReasonPhrase::new("")?,
+        String::new(),
+    ))
 }
