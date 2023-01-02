@@ -1,61 +1,41 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "http_server.fullname" . }}
-  labels:
-    {{- include "http_server.labels" . | nindent 4 }}
+  name: http-server
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
+  replicas: 2
   selector:
     matchLabels:
-      {{- include "http_server.selectorLabels" . | nindent 6 }}
+      app: http-server
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       labels:
-        {{- include "http_server.selectorLabels" . | nindent 8 }}
+        app: http-server
+      annotations:
+        module.wasm.image/variant: compat-smart
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "http_server.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      hostNetwork: true
+      runtimeClassName: "crun"
       containers:
-        - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: 8080
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      - name: http-server
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health/liveness
+            port: http
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: http
+        resources:
+           limits:
+             memory: 32Mi
+             cpu: 125m
+           requests:
+             memory: 32Mi
+             cpu: 125m
