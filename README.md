@@ -100,6 +100,7 @@ Ingress Subdomain:              CLUSTERNAME-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-x
 Ingress Secret:                 CLUSTERNAME-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxx
 Ingress Status:                 healthy
 Ingress Message:                All Ingress components are healthy.
+```
 
 Using `Ingress Subdomain` and `Ingress Secret` you can run the chart with
 ```
