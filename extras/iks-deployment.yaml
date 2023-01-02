@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: http-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: http-server
+  template:
+    metadata:
+      labels:
+        app: http-server
+      annotations:
+        module.wasm.image/variant: compat-smart
+    spec:
+      hostNetwork: true
+      runtimeClassName: "crun"
+      containers:
+      - name: http-server
+        image: quay.io/uirlis/http_server:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health/liveness
+            port: http
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: http
+        resources:
+           limits:
+             memory: 32Mi
+             cpu: 125m
+           requests:
+             memory: 32Mi
+             cpu: 125m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-server-service
+  labels:
+    app: http-server-service
+spec:
+  type: NodePort
+  ports:
+    # the port that this service should serve on
+    - port: 80
+      targetPort: 8080
+  # label keys and values that must match in order to receive traffic for this service
+  selector:
+    app: http-server
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-server-cip
+  labels:
+    app: http-server
+spec:
+  type: ClusterIP
+  ports:
+    # the port that this service should serve on
+    - port: 80
+      targetPort: 8080
+  # label keys and values that must match in order to receive traffic for this service
+  selector:
+    app: http-server
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: http-server-ingress
+spec:
+  rules:
+  - host: YOUR_HOST
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: http-server-cip
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - YOUR_HOST
+    secretName: YOUR_SECRET

@@ -51,7 +51,7 @@ curl -d '{"hello": "world"}' \
 ```
 
 
-## Run in Podman
+## run in podman
 
 Make sure you have a WASMEdge compatible crun.
 
@@ -80,13 +80,41 @@ podman run -p 8080:8080 quay.io/uirlis/http_server
 ```
 
 
-## deploy
+## deploy in IBM Cloud Kubernetes Service
 
+With the IKS environment configured with https://github.com/uirlis/wasi-crun-deployer
+
+Move into the chart folder
 ```
 cd charts/http_server
-helm install http_server . --create-namespace --namespace wasiservice
 ```
 
+If you have customised the httpserver then publish it to a container registry and update the image details in the `values.yaml`
+
+If you want to make the service available on the internet then you will need to update the Ingress definition.
+First get the subdomain and tls secret.
+```
+ibmcloud ks cluster get --cluster CLUSTERNAME | grep Ingress
+...
+Ingress Subdomain:              CLUSTERNAME-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxx.eu-de.containers.appdomain.cloud
+Ingress Secret:                 CLUSTERNAME-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxx
+Ingress Status:                 healthy
+Ingress Message:                All Ingress components are healthy.
+
+Using `Ingress Subdomain` and `Ingress Secret` you can run the chart with
+```
+helm install http_server . --set ingress.host=CLUSTERNAME-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxx.eu-de.containers.appdomain.cloud --set ingress.secretName=CLUSTERNAME-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxx
+```
+
+Or set them in values.yaml
+
+```
+ingress:
+    host: CLUSTERNAME-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxx.eu-de.containers.appdomain.cloud
+    secretName: CLUSTERNAME-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxx
+```
+
+# Extras
 
 ## crun build
 
@@ -108,4 +136,43 @@ spec: 1.0.0
 
 # cp $(which crun) crun-bak
 # cp crun $(which crun)
+```
+
+## simple kubectl deployment
+
+in [extras](extras) there is a single `iks-deployment.yaml` that needs the `YOUR_HOST` and `YOUR_SECRET` arguments updating from the command 
+
+```
+ibmcloud ks cluster get --cluster CLUSTERNAME | grep Ingress
+...
+Ingress Subdomain:              CLUSTERNAME-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxx.eu-de.containers.appdomain.cloud
+Ingress Secret:                 CLUSTERNAME-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-xxxx
+Ingress Status:                 healthy
+Ingress Message:                All Ingress components are healthy.
+```
+
+```yaml
+....
+spec:
+  rules:
+  - host: YOUR_HOST
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: http-server-cip
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - YOUR_HOST
+    secretName: YOUR_SECRET
+```
+
+This can then be applied with:
+
+```
+kubectl apply -f iks-deployment.yaml
 ```
