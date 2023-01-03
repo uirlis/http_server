@@ -1,49 +1,47 @@
-use httpcodec::{HttpVersion, Method, ReasonPhrase, Request, Response, StatusCode};
-use log::info;
+use hyper::{Body, Method, Request, Response, StatusCode};
+pub async fn handle_request(req: Request<Body>) -> Result<Response<Body>, anyhow::Error> {
+    match (req.method(), req.uri().path()) {
+        (&Method::GET, "/") => Ok(Response::new(Body::from("Hi There!"))),
 
-pub fn index(req: Request<String>) -> bytecodec::Result<Response<String>> {
-    info!("{:#?}", req);
-    if req.method() == Method::new("GET").unwrap() {
-        Ok(Response::new(
-            HttpVersion::V1_0,
-            StatusCode::new(200)?,
-            ReasonPhrase::new("")?,
-            "Get Request!\n".to_string(),
-        ))
-    } else {
-        Ok(Response::new(
-            HttpVersion::V1_0,
-            StatusCode::new(200)?,
-            ReasonPhrase::new("")?,
-            format!("echo: {}", req.body()),
-        ))
+        (&Method::POST, "/") => Ok(Response::new(req.into_body())),
+
+        _ => {
+            let mut not_found = Response::default();
+            *not_found.status_mut() = StatusCode::NOT_FOUND;
+            Ok(not_found)
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use httpcodec::RequestTarget;
-    #[test]
-    fn get_test() {
-        let req = Request::<String>::new(
-            Method::new("GET").unwrap(),
-            RequestTarget::new("/").unwrap(),
-            HttpVersion::V1_0,
-            String::new(),
-        );
-        let res = index(req);
-        assert_eq!(res.unwrap().body(), "Get Request!\n");
+    #[tokio::test]
+    async fn get_test() -> Result<(), Box<dyn std::error::Error>> {
+        let req = hyper::Request::builder()
+            .method(hyper::Method::GET)
+            .uri("/")
+            .header("user-agent", "rust-test")
+            .body(hyper::Body::from(""))?;
+
+        let resp = handle_request(req).await?;
+        let body_bytes = hyper::body::to_bytes(resp.into_body()).await?;
+        let body = String::from_utf8(body_bytes.to_vec()).unwrap();
+        assert_eq!(body, "Hi There!");
+        Ok(())
     }
-    #[test]
-    fn post_test() {
-        let req = Request::<String>::new(
-            Method::new("POST").unwrap(),
-            RequestTarget::new("/").unwrap(),
-            HttpVersion::V1_0,
-            "echo".to_string(),
-        );
-        let res = index(req);
-        assert_eq!(res.unwrap().body(), "echo: echo");
+    #[tokio::test]
+    async fn post_test() -> Result<(), Box<dyn std::error::Error>> {
+        let req = hyper::Request::builder()
+            .method(hyper::Method::POST)
+            .uri("/")
+            .header("user-agent", "rust-test")
+            .body(hyper::Body::from("echo"))?;
+
+        let resp = handle_request(req).await?;
+        let body_bytes = hyper::body::to_bytes(resp.into_body()).await?;
+        let body = String::from_utf8(body_bytes.to_vec()).unwrap();
+        assert_eq!(body, "echo");
+        Ok(())
     }
 }
