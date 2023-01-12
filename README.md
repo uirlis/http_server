@@ -34,9 +34,11 @@ cargo wasi build --release # build the optimized version of your *.wasm.
 
 cargo wasi run # execute a binary.
 
-cargo wasi test # run your tests in wasm32-wasi.
+cargo wasi test -- --nocapture # run your tests in wasm32-wasi --nocapture provided better error output
 
 cargo wasi bench # run your benchmarks in wasm32-wasi.
+
+cargo clippy --target wasm32-wasi # There is no wasi wrapper for clippy as yet
 ```
 
 Once running, the function is available at <http://localhost:8080> and
