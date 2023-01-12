@@ -17,7 +17,7 @@ spec:
       runtimeClassName: "crun"
       containers:
       - name: http-server
-        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        image: quay.io/uirlis/http_server:latest
         imagePullPolicy: Always
         ports:
         - name: http
@@ -45,3 +45,19 @@ spec:
           seccompProfile:
             type : RuntimeDefault
           runAsNonRoot: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-server-cip
+  labels:
+    app: http-server
+spec:
+  type: ClusterIP
+  ports:
+    # the port that this service should serve on
+    - port: 80
+      targetPort: 8080
+  # label keys and values that must match in order to receive traffic for this service
+  selector:
+    app: http-server
